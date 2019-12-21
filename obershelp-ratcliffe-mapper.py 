@@ -1,0 +1,45 @@
+import pandas as pd
+import json
+import textdistance as td
+from numpy import nan
+
+# fep is for Finngen endpoints
+fep = pd.read_csv("no_match.txt",  sep="\t")
+# names is for a DOID table with the following column structure: name, doid 
+names = pd.read_csv("name_DOID.txt",  sep="\t")
+# synos is for a DOID synonyms table with the following column structure: synonym, doid
+synos = pd.read_csv("Synonym_DOID.txt",  sep="\t")
+
+# append synonyms to names
+synos.columns = ['name', 'doid']
+all = names.append(synos, ignore_index=True)
+
+# drop obsolete values
+all = all[~all['name'].str.contains('obsolete')].reset_index(drop=True)
+# drop nulls
+fep = fep[fep['LONGNAME'].notnull()].reset_index(drop=True)
+# format doid & treshold(similarity value) column
+fep['nlp_doid'] = nan
+fep['similarity'] = nan
+fep['match_name'] = nan
+
+# user itertuples for better performance
+for fep_row in fep.itertuples():
+    doid = 0
+    tresh = 0
+    tmp = 0
+    tmp_name = ""
+    for row in all.itertuples():
+        tmp = td.ratcliff_obershelp(fep_row.LONGNAME, row.name)
+        if tresh < tmp:
+            tresh = tmp
+            tmp = 0 
+            doid = row.doid
+            tmp_name = row.name
+            # uncomment below to view console output 
+            # print(row.name)
+            # print(row.doid)
+            # print(tresh)
+    fep['nlp_doid'][fep_row.Index]=doid
+    fep['similarity'][fep_row.Index]=tresh
+    fep['match_name'][fep_row.Index]=tmp_name
